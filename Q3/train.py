@@ -21,6 +21,14 @@ def make_env():
     env = make_dmc_env(env_name, np.random.randint(0, 1000000), flatten=True, use_pixels=False)
     return env
 
+def freeze(module):
+    for param in module.parameters():
+        param.requires_grad = False
+
+def unfreeze(module):
+    for param in module.parameters():
+        param.requires_grad = True
+
 class SAC:
     def __init__(self):
         self.env = make_env()
@@ -43,8 +51,9 @@ class SAC:
         self.critic2_optim = torch.optim.Adam(self.critic2.parameters(), lr=LR)
         self.alpha_optim = torch.optim.Adam([self.log_alpha], lr=LR)
     def soft_update(self, target, source, tau):
-        for target_param, param in zip(target.parameters(), source.parameters()):
-            target_param.data.copy_(tau * param.data + (1 - tau) * target_param.data)
+        with torch.no_grad():
+            for target_param, param in zip(target.parameters(), source.parameters()):
+                target_param.data.copy_(tau * param.data + (1 - tau) * target_param.data)
     def train(self):
         best_avg_reward = -np.inf
         for episode in range(NUM_EPISODES):
@@ -82,17 +91,19 @@ class SAC:
                         q1_next = self.critic1_target(batch_next_obs, next_action)
                         q2_next = self.critic2_target(batch_next_obs, next_action)
                         q_next = torch.min(q1_next, q2_next)  # (B,1)
-                        q_target = batch_reward + (1 - batch_dones) * GAMMA * (q_next - self.log_alpha.exp() * log_prob)
+                        q_target = batch_reward + GAMMA * (q_next - self.log_alpha.exp() * log_prob)
 
                     critic1_loss = F.mse_loss(q1, q_target)
                     critic2_loss = F.mse_loss(q2, q_target)
-
                     self.critic1_optim.zero_grad()
                     self.critic2_optim.zero_grad()
                     critic1_loss.backward()
                     critic2_loss.backward()
                     self.critic1_optim.step()
                     self.critic2_optim.step()
+
+                    freeze(self.critic1)
+                    freeze(self.critic2)
 
                     # --- Actor & alpha updates ---
                     action_pi, log_prob_pi = self.actor(batch_obs, deterministic=False, with_logprob=True)
@@ -110,6 +121,8 @@ class SAC:
                     alpha_loss.backward()
                     self.alpha_optim.step()
 
+                    unfreeze(self.critic1)
+                    unfreeze(self.critic2)
                     # --- Target networks update ---
                     self.soft_update(self.critic1_target, self.critic1, TAU)
                     self.soft_update(self.critic2_target, self.critic2, TAU)

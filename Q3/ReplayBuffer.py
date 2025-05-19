@@ -8,7 +8,7 @@ class ReplayBuffer:
   """A simple FIFO experience replay buffer for SAC."""
 
   def __init__(self, obs_dim: int, act_dim: int, size: int = int(2e6),
-               batch_size: int = 1024):
+               batch_size: int = 256):
     self.obs_buf = np.zeros((size, obs_dim), dtype=np.float32)
     self.next_obs_buf = np.zeros((size, obs_dim), dtype=np.float32)
     self.act_buf = np.zeros((size, act_dim), dtype=np.float32)
