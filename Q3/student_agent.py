@@ -49,7 +49,7 @@ class Agent(object):
         self.action_space = gym.spaces.Box(-1.0, 1.0, (21,), np.float64)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.actor = Actor(67, 21).to(self.device)
-        self.actor.load_state_dict(torch.load("best_actor.pth"), map_location=self.device)
+        self.actor.load_state_dict(torch.load("best_actor.pth", map_location=self.device))
 
     def act(self, observation):
         action, _ = self.actor(torch.tensor(observation, dtype=torch.float32, device = self.device).unsqueeze(0))
